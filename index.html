@@ -2,9 +2,22 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>TaskSphere - Grouped Checklist App</title>
-    
+    <meta name="description" content="TaskSphere — beautifully organize your tasks with grouped checklists. Installable, offline-ready PWA.">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Theme Color (browser toolbar) -->
+    <meta name="theme-color" content="#3b82f6">
+
+    <!-- iOS PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TaskSphere">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
     <!-- Google Fonts: Outfit (EN headings), Inter (EN body), Cairo (Arabic typography) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,6 +25,9 @@
     
     <!-- Core Stylesheet -->
     <link rel="stylesheet" href="style.css">
+
+    <!-- sql.js — WebAssembly SQLite for the browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.js"></script>
 </head>
 <body>
     <!-- Confetti canvas for complete celebration animations -->
@@ -168,5 +184,16 @@
 
     <!-- Core Logic Scripts -->
     <script src="app.js"></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('[TaskSphere] Service Worker registered:', reg.scope))
+                    .catch(err => console.warn('[TaskSphere] Service Worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
 </html>

@@ -227,57 +227,224 @@ function translateUi() {
 
 function toggleLanguage() {
     const newLang = state.language === 'en' ? 'ar' : 'en';
-    
-    // If the active state groups represent the default unedited groups, we can swap them for localized defaults
-    const isCurrentlyDefaultEn = JSON.stringify(state.groups.map(g => g.name)) === JSON.stringify(DEFAULT_GROUPS_EN.map(g => g.name));
-    const isCurrentlyDefaultAr = JSON.stringify(state.groups.map(g => g.name)) === JSON.stringify(DEFAULT_GROUPS_AR.map(g => g.name));
-    
     state.language = newLang;
-    
-    if (isCurrentlyDefaultEn && newLang === 'ar') {
-        state.groups = JSON.parse(JSON.stringify(DEFAULT_GROUPS_AR));
-        state.activeGroupId = state.groups[0].id;
-    } else if (isCurrentlyDefaultAr && newLang === 'en') {
-        state.groups = JSON.parse(JSON.stringify(DEFAULT_GROUPS_EN));
-        state.activeGroupId = state.groups[0].id;
-    }
-
-    saveState();
-    renderAll();
+    if (!db) { renderAll(); return; }
+    db.run("INSERT OR REPLACE INTO settings (key,value) VALUES ('language',?)", [newLang]);
+    persistDatabase().then(() => renderAll());
 }
 
 /* ==========================================================================
-   LOCAL STORAGE STORAGE SYNC
+   SQLITE DATABASE LAYER (sql.js + IndexedDB persistence)
    ========================================================================== */
-function saveState() {
-    localStorage.setItem('tasksphere_state', JSON.stringify(state));
+let db = null;
+const IDB_DB_NAME = 'tasksphere-idb';
+const IDB_STORE   = 'sqlitedb';
+const IDB_KEY     = 'db';
+
+/** Open the IndexedDB that holds our SQLite binary blob */
+function openIdb() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_DB_NAME, 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+    });
 }
 
-function loadState() {
-    const saved = localStorage.getItem('tasksphere_state');
-    if (saved) {
-        try {
-            state = JSON.parse(saved);
-        } catch (e) {
-            console.error('Failed to parse saved state, resetting.', e);
-            resetToDefault();
-        }
-    } else {
-        resetToDefault();
+/** Load the raw SQLite Uint8Array from IndexedDB (or null if first run) */
+function idbLoad() {
+    return openIdb().then(idb => new Promise((resolve, reject) => {
+        const tx  = idb.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+        req.onsuccess = e => resolve(e.target.result || null);
+        req.onerror   = e => reject(e.target.error);
+    }));
+}
+
+/** Save the raw SQLite Uint8Array to IndexedDB */
+function idbSave(data) {
+    return openIdb().then(idb => new Promise((resolve, reject) => {
+        const tx  = idb.transaction(IDB_STORE, 'readwrite');
+        const req = tx.objectStore(IDB_STORE).put(data, IDB_KEY);
+        req.onsuccess = () => resolve();
+        req.onerror   = e => reject(e.target.error);
+    }));
+}
+
+/** Serialize the current in-memory DB and save it to IndexedDB */
+function persistDatabase() {
+    if (!db) return Promise.resolve();
+    const data = db.export();
+    return idbSave(data);
+}
+
+/** Create all tables if they don't exist */
+function createSchema() {
+    db.run(`
+        CREATE TABLE IF NOT EXISTS groups (
+            id         TEXT PRIMARY KEY,
+            name       TEXT NOT NULL,
+            color      TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS lists (
+            id         TEXT PRIMARY KEY,
+            group_id   TEXT NOT NULL,
+            name       TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS items (
+            id         TEXT PRIMARY KEY,
+            list_id    TEXT NOT NULL,
+            text       TEXT NOT NULL,
+            completed  INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+    `);
+}
+
+/** Seed the DB with default groups/lists/items for the given language */
+function seedDefaults(lang) {
+    const defaults = lang === 'ar' ? DEFAULT_GROUPS_AR : DEFAULT_GROUPS_EN;
+    defaults.forEach((group, gi) => {
+        db.run(
+            'INSERT OR IGNORE INTO groups (id, name, color, sort_order) VALUES (?,?,?,?)',
+            [group.id, group.name, group.color, gi]
+        );
+        group.lists.forEach((list, li) => {
+            db.run(
+                'INSERT OR IGNORE INTO lists (id, group_id, name, sort_order) VALUES (?,?,?,?)',
+                [list.id, group.id, list.name, li]
+            );
+            list.items.forEach((item, ii) => {
+                db.run(
+                    'INSERT OR IGNORE INTO items (id, list_id, text, completed, sort_order) VALUES (?,?,?,?,?)',
+                    [item.id, list.id, item.text, item.completed ? 1 : 0, ii]
+                );
+            });
+        });
+    });
+    db.run("INSERT OR IGNORE INTO settings (key,value) VALUES ('theme','dark')");
+    db.run(`INSERT OR IGNORE INTO settings (key,value) VALUES ('language','${lang}')`);
+}
+
+/** Migrate an existing localStorage JSON blob into the fresh SQLite DB */
+function migrateFromLocalStorage() {
+    const raw = localStorage.getItem('tasksphere_state');
+    if (!raw) return false;
+    try {
+        const old = JSON.parse(raw);
+        const lang = old.language || 'en';
+        const theme = old.theme || 'dark';
+        (old.groups || []).forEach((group, gi) => {
+            db.run(
+                'INSERT OR IGNORE INTO groups (id, name, color, sort_order) VALUES (?,?,?,?)',
+                [group.id, group.name, group.color, gi]
+            );
+            (group.lists || []).forEach((list, li) => {
+                db.run(
+                    'INSERT OR IGNORE INTO lists (id, group_id, name, sort_order) VALUES (?,?,?,?)',
+                    [list.id, group.id, list.name, li]
+                );
+                (list.items || []).forEach((item, ii) => {
+                    db.run(
+                        'INSERT OR IGNORE INTO items (id, list_id, text, completed, sort_order) VALUES (?,?,?,?,?)',
+                        [item.id, list.id, item.text, item.completed ? 1 : 0, ii]
+                    );
+                });
+            });
+        });
+        db.run("INSERT OR REPLACE INTO settings (key,value) VALUES ('theme',?)", [theme]);
+        db.run("INSERT OR REPLACE INTO settings (key,value) VALUES ('language',?)", [lang]);
+        localStorage.removeItem('tasksphere_state'); // clean up old data
+        console.log('[TaskSphere] Migrated data from localStorage to SQLite');
+        return true;
+    } catch(e) {
+        console.warn('[TaskSphere] Migration failed, seeding defaults.', e);
+        return false;
     }
-    
-    // Set active group if not exists or invalid
-    if (!state.activeGroupId && state.groups.length > 0) {
+}
+
+/** Rebuild the in-memory state object from SQLite */
+function loadStateFromDB() {
+    // Load settings
+    const settingsRows = db.exec('SELECT key, value FROM settings');
+    if (settingsRows.length > 0) {
+        settingsRows[0].values.forEach(([key, value]) => {
+            if (key === 'theme') state.theme = value;
+            if (key === 'language') state.language = value;
+            if (key === 'activeGroupId') state.activeGroupId = value;
+        });
+    }
+
+    // Load groups (ordered by sort_order)
+    const groupRows = db.exec('SELECT id, name, color FROM groups ORDER BY sort_order ASC');
+    state.groups = [];
+    if (groupRows.length > 0) {
+        groupRows[0].values.forEach(([id, name, color]) => {
+            state.groups.push({ id, name, color, lists: [] });
+        });
+    }
+
+    // Load lists (ordered by sort_order)
+    const listRows = db.exec('SELECT id, group_id, name FROM lists ORDER BY sort_order ASC');
+    if (listRows.length > 0) {
+        listRows[0].values.forEach(([id, group_id, name]) => {
+            const group = state.groups.find(g => g.id === group_id);
+            if (group) group.lists.push({ id, name, items: [] });
+        });
+    }
+
+    // Load items (ordered by sort_order)
+    const itemRows = db.exec('SELECT id, list_id, text, completed FROM items ORDER BY sort_order ASC');
+    if (itemRows.length > 0) {
+        itemRows[0].values.forEach(([id, list_id, text, completed]) => {
+            state.groups.forEach(g => {
+                const list = g.lists.find(l => l.id === list_id);
+                if (list) list.items.push({ id, text, completed: completed === 1 });
+            });
+        });
+    }
+
+    // Validate activeGroupId
+    const activeValid = state.groups.some(g => g.id === state.activeGroupId);
+    if (!activeValid && state.groups.length > 0) {
         state.activeGroupId = state.groups[0].id;
     }
 }
 
-function resetToDefault() {
-    const lang = state.language || 'en';
-    state.groups = JSON.parse(JSON.stringify(lang === 'ar' ? DEFAULT_GROUPS_AR : DEFAULT_GROUPS_EN));
-    state.activeGroupId = state.groups[0].id;
-    state.theme = 'dark';
-    saveState();
+/** Main async init — call once on DOMContentLoaded */
+async function initDatabase() {
+    // 1. Initialise sql.js (WASM)
+    const SQL = await initSqlJs({
+        locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/${file}`
+    });
+
+    // 2. Try to restore existing DB from IndexedDB
+    const savedBuffer = await idbLoad();
+    if (savedBuffer) {
+        db = new SQL.Database(savedBuffer);
+        createSchema(); // add any new tables if schema was upgraded
+        console.log('[TaskSphere] DB restored from IndexedDB');
+    } else {
+        db = new SQL.Database();
+        createSchema();
+        // 3a. Try migrating old localStorage data
+        const migrated = migrateFromLocalStorage();
+        // 3b. If nothing to migrate, seed with defaults
+        if (!migrated) {
+            seedDefaults(state.language || 'en');
+            console.log('[TaskSphere] DB seeded with default data');
+        }
+        await persistDatabase();
+    }
+
+    // 4. Load state from DB into memory
+    loadStateFromDB();
 }
 
 /* ==========================================================================
@@ -293,7 +460,10 @@ function toggleTheme() {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     state.theme = newTheme;
     document.documentElement.setAttribute('data-theme', newTheme);
-    saveState();
+    if (db) {
+        db.run("INSERT OR REPLACE INTO settings (key,value) VALUES ('theme',?)", [newTheme]);
+        persistDatabase();
+    }
 }
 
 /* ==========================================================================
@@ -844,30 +1014,32 @@ function renderWorkspace() {
 function reorderGroups(sourceId, targetId) {
     const sourceIndex = state.groups.findIndex(g => g.id === sourceId);
     const targetIndex = state.groups.findIndex(g => g.id === targetId);
-    
-    if (sourceIndex !== -1 && targetIndex !== -1) {
-        const [draggedGroup] = state.groups.splice(sourceIndex, 1);
-        state.groups.splice(targetIndex, 0, draggedGroup);
-        
-        saveState();
-        renderAll();
-    }
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const [draggedGroup] = state.groups.splice(sourceIndex, 1);
+    state.groups.splice(targetIndex, 0, draggedGroup);
+
+    // Persist new sort order
+    state.groups.forEach((g, i) => {
+        db.run('UPDATE groups SET sort_order = ? WHERE id = ?', [i, g.id]);
+    });
+    persistDatabase().then(() => renderAll());
 }
 
 function reorderLists(groupId, sourceListId, targetListId) {
     const group = state.groups.find(g => g.id === groupId);
-    if (group) {
-        const sourceIndex = group.lists.findIndex(l => l.id === sourceListId);
-        const targetIndex = group.lists.findIndex(l => l.id === targetListId);
-        
-        if (sourceIndex !== -1 && targetIndex !== -1) {
-            const [draggedList] = group.lists.splice(sourceIndex, 1);
-            group.lists.splice(targetIndex, 0, draggedList);
-            
-            saveState();
-            renderAll();
-        }
-    }
+    if (!group) return;
+    const sourceIndex = group.lists.findIndex(l => l.id === sourceListId);
+    const targetIndex = group.lists.findIndex(l => l.id === targetListId);
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const [draggedList] = group.lists.splice(sourceIndex, 1);
+    group.lists.splice(targetIndex, 0, draggedList);
+
+    group.lists.forEach((l, i) => {
+        db.run('UPDATE lists SET sort_order = ? WHERE id = ?', [i, l.id]);
+    });
+    persistDatabase().then(() => renderAll());
 }
 
 /* ==========================================================================
@@ -877,125 +1049,135 @@ function reorderLists(groupId, sourceListId, targetListId) {
 // --- Groups ---
 function createOrUpdateGroup(name, color, id = null) {
     if (id) {
-        const group = state.groups.find(g => g.id === id);
-        if (group) {
-            group.name = name;
-            group.color = color;
-        }
+        db.run('UPDATE groups SET name = ?, color = ? WHERE id = ?', [name, color, id]);
     } else {
-        const newGroup = {
-            id: uuid(),
-            name: name,
-            color: color,
-            lists: []
-        };
-        state.groups.push(newGroup);
-        state.activeGroupId = newGroup.id;
+        const newId = uuid();
+        const sortOrder = state.groups.length;
+        db.run(
+            'INSERT INTO groups (id, name, color, sort_order) VALUES (?,?,?,?)',
+            [newId, name, color, sortOrder]
+        );
+        // Remember the new group as active
+        db.run("INSERT OR REPLACE INTO settings (key,value) VALUES ('activeGroupId',?)", [newId]);
     }
-    saveState();
-    renderAll();
+    persistDatabase().then(() => {
+        loadStateFromDB();
+        renderAll();
+    });
 }
 
 function deleteGroup(id) {
     if (confirm(t('confirm-delete-group'))) {
-        state.groups = state.groups.filter(g => g.id !== id);
-        if (state.activeGroupId === id) {
-            state.activeGroupId = state.groups.length > 0 ? state.groups[0].id : null;
+        // Cascade: delete lists and items manually (sql.js doesn't enforce FK by default)
+        const lists = db.exec('SELECT id FROM lists WHERE group_id = ?', [id]);
+        if (lists.length > 0) {
+            lists[0].values.forEach(([lid]) => {
+                db.run('DELETE FROM items WHERE list_id = ?', [lid]);
+            });
         }
-        saveState();
-        renderAll();
+        db.run('DELETE FROM lists WHERE group_id = ?', [id]);
+        db.run('DELETE FROM groups WHERE id = ?', [id]);
+
+        // Update active group if needed
+        loadStateFromDB();
+        if (state.activeGroupId === id || !state.activeGroupId) {
+            const firstGroup = state.groups.find(g => g.id !== id);
+            const newActive = firstGroup ? firstGroup.id : null;
+            state.activeGroupId = newActive;
+            if (newActive) {
+                db.run("INSERT OR REPLACE INTO settings (key,value) VALUES ('activeGroupId',?)", [newActive]);
+            }
+        }
+        persistDatabase().then(() => {
+            loadStateFromDB();
+            renderAll();
+        });
     }
 }
 
 // --- Lists ---
 function addList(groupId, name) {
     const group = state.groups.find(g => g.id === groupId);
-    if (group) {
-        group.lists.push({
-            id: uuid(),
-            name: name,
-            items: []
-        });
-        saveState();
+    if (!group) return;
+    const sortOrder = group.lists.length;
+    const newId = uuid();
+    db.run(
+        'INSERT INTO lists (id, group_id, name, sort_order) VALUES (?,?,?,?)',
+        [newId, groupId, name, sortOrder]
+    );
+    persistDatabase().then(() => {
+        loadStateFromDB();
         renderAll();
-    }
+    });
 }
 
 function renameList(groupId, listId, newName) {
-    const group = state.groups.find(g => g.id === groupId);
-    if (group) {
-        const list = group.lists.find(l => l.id === listId);
-        if (list) {
-            list.name = newName;
-            saveState();
-            renderAll();
-        }
-    }
+    db.run('UPDATE lists SET name = ? WHERE id = ?', [newName, listId]);
+    persistDatabase().then(() => {
+        loadStateFromDB();
+        renderAll();
+    });
 }
 
 function deleteList(groupId, listId) {
     const group = state.groups.find(g => g.id === groupId);
-    if (group) {
-        const list = group.lists.find(l => l.id === listId);
-        if (confirm(t('confirm-delete-list', { name: list.name }))) {
-            group.lists = group.lists.filter(l => l.id !== listId);
-            saveState();
+    if (!group) return;
+    const list = group.lists.find(l => l.id === listId);
+    if (!list) return;
+    if (confirm(t('confirm-delete-list', { name: list.name }))) {
+        db.run('DELETE FROM items WHERE list_id = ?', [listId]);
+        db.run('DELETE FROM lists WHERE id = ?', [listId]);
+        persistDatabase().then(() => {
+            loadStateFromDB();
             renderAll();
-        }
+        });
     }
 }
 
 // --- Items ---
 function addItem(groupId, listId, text) {
     const group = state.groups.find(g => g.id === groupId);
-    if (group) {
-        const list = group.lists.find(l => l.id === listId);
-        if (list) {
-            list.items.push({
-                id: uuid(),
-                text: text,
-                completed: false
-            });
-            saveState();
-            renderAll();
-        }
-    }
+    if (!group) return;
+    const list = group.lists.find(l => l.id === listId);
+    if (!list) return;
+    const sortOrder = list.items.length;
+    const newId = uuid();
+    db.run(
+        'INSERT INTO items (id, list_id, text, completed, sort_order) VALUES (?,?,?,0,?)',
+        [newId, listId, text, sortOrder]
+    );
+    persistDatabase().then(() => {
+        loadStateFromDB();
+        renderAll();
+    });
 }
 
 function toggleItemCompletion(groupId, listId, itemId, completed) {
+    db.run('UPDATE items SET completed = ? WHERE id = ?', [completed ? 1 : 0, itemId]);
+
+    // Check for list completion (for confetti)
+    loadStateFromDB();
     const group = state.groups.find(g => g.id === groupId);
+    let listComplete = false;
     if (group) {
         const list = group.lists.find(l => l.id === listId);
-        if (list) {
-            const item = list.items.find(i => i.id === itemId);
-            if (item) {
-                item.completed = completed;
-                
-                const listTotal = list.items.length;
-                const listCompleted = list.items.filter(i => i.completed).length;
-                
-                saveState();
-                
-                if (completed && listCompleted === listTotal) {
-                    triggerConfetti();
-                }
-
-                renderAll();
-            }
+        if (list && list.items.length > 0) {
+            listComplete = completed && list.items.every(i => i.completed);
         }
     }
+
+    persistDatabase().then(() => {
+        if (listComplete) triggerConfetti();
+        renderAll();
+    });
 }
 
 function deleteItem(groupId, listId, itemId) {
-    const group = state.groups.find(g => g.id === groupId);
-    if (group) {
-        const list = group.lists.find(l => l.id === listId);
-        if (list) {
-            list.items = list.items.filter(i => i.id !== itemId);
-            saveState();
-            renderAll();
-        }
-    }
+    db.run('DELETE FROM items WHERE id = ?', [itemId]);
+    persistDatabase().then(() => {
+        loadStateFromDB();
+        renderAll();
+    });
 }
 
 /* ==========================================================================
@@ -1015,9 +1197,18 @@ function escapeHtml(text) {
 /* ==========================================================================
    INITIALIZATION & EVENT REGISTRATION
    ========================================================================== */
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Initialize State
-    loadState();
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Initialize SQLite DB (async), then render
+    try {
+        await initDatabase();
+    } catch (e) {
+        console.error('[TaskSphere] DB init failed:', e);
+        // Fallback: seed in-memory state if DB fails
+        const lang = state.language || 'en';
+        state.groups = JSON.parse(JSON.stringify(lang === 'ar' ? DEFAULT_GROUPS_AR : DEFAULT_GROUPS_EN));
+        state.activeGroupId = state.groups[0].id;
+        state.theme = 'dark';
+    }
     initTheme();
     renderAll();
 
