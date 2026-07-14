@@ -2,13 +2,22 @@ import { useState } from 'react'
 import { useApp, useT } from '../AppContext.js'
 
 export default function ListCard({ list, groupId, groupColor }) {
-  const { state, renameList, deleteList, addItem, toggleItemCompletion, deleteItem, reorderLists } = useApp()
+  const { state, renameList, deleteList, addItem, toggleItemCompletion, deleteItem, editItem, reorderLists, openConfirmModal } = useApp()
   const t = useT()
   const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState('')
   const [itemText, setItemText] = useState('')
   const [dragging, setDragging] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [editingItemId, setEditingItemId] = useState(null)
+  const [editingItemText, setEditingItemText] = useState('')
+
+  function startEditItem(item) { setEditingItemId(item.id); setEditingItemText(item.text) }
+  function finishEditItem(groupId, listId, itemId) {
+    const v = editingItemText.trim()
+    if (v && v !== list.items.find((i) => i.id === itemId)?.text) editItem(groupId, listId, itemId, v)
+    setEditingItemId(null)
+  }
 
   const total = list.items.length
   const done = list.items.filter((i) => i.completed).length
@@ -22,7 +31,11 @@ export default function ListCard({ list, groupId, groupColor }) {
     setRenaming(false)
   }
   function handleDeleteList() {
-    if (window.confirm(t('confirm-delete-list', { name: list.name }))) deleteList(groupId, list.id)
+    openConfirmModal({
+      title: t('delete-list'),
+      message: t('confirm-delete-list', { name: list.name }),
+      onConfirm: () => deleteList(groupId, list.id),
+    })
   }
   function handleAddItem(e) {
     e.preventDefault()
@@ -109,15 +122,41 @@ export default function ListCard({ list, groupId, groupColor }) {
                 <span className="checkbox-custom">
                   <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
                 </span>
-                <span className="item-text">{item.text}</span>
+                {editingItemId === item.id ? (
+                  <input
+                    type="text"
+                    className="inline-edit-input"
+                    value={editingItemText}
+                    onChange={(e) => setEditingItemText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') finishEditItem(groupId, list.id, item.id); if (e.key === 'Escape') setEditingItemId(null) }}
+                    onBlur={() => finishEditItem(groupId, list.id, item.id)}
+                    maxLength={100}
+                    autoFocus
+                  />
+                ) : (
+                  <span className="item-text" onDoubleClick={() => startEditItem(item)}>{item.text}</span>
+                )}
               </label>
-              <button className="btn-delete-item" title={t('delete-item')}
-                onClick={() => deleteItem(groupId, list.id, item.id)}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              <div className="item-actions">
+                <button className="btn-edit-item" title={t('edit-item')}
+                  onClick={() => startEditItem(item)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                </button>
+                <button className="btn-delete-item" title={t('delete-item')}
+                  onClick={() => openConfirmModal({
+                    title: t('delete-item'),
+                    message: t('confirm-delete-item', { name: item.text }),
+                    onConfirm: () => deleteItem(groupId, list.id, item.id),
+                  })}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
             </div>
           ))
         )}

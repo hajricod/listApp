@@ -4,7 +4,7 @@ import EmptyState from './EmptyState.jsx'
 import AddListCard from './AddListCard.jsx'
 
 export default function MainPanel() {
-  const { state, openGroupModal, deleteGroup } = useApp()
+  const { state, openGroupModal, deleteGroup, openConfirmModal } = useApp()
   const t = useT()
 
   if (state.groups.length === 0) {
@@ -23,7 +23,11 @@ export default function MainPanel() {
   const completionRate = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
 
   function handleDelete() {
-    if (window.confirm(t('confirm-delete-group'))) deleteGroup(activeGroup.id)
+    openConfirmModal({
+      title: t('delete-group'),
+      message: t('confirm-delete-group'),
+      onConfirm: () => deleteGroup(activeGroup.id),
+    })
   }
 
   return (

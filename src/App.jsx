@@ -7,6 +7,7 @@ import { AppContext } from './AppContext.js'
 import Sidebar from './components/Sidebar.jsx'
 import MainPanel from './components/MainPanel.jsx'
 import GroupModal from './components/GroupModal.jsx'
+import ConfirmModal from './components/ConfirmModal.jsx'
 
 export default function App() {
   const [state, setState] = useState({
@@ -17,6 +18,7 @@ export default function App() {
   })
   const dbRef = useRef(null)
   const [groupModal, setGroupModal] = useState({ open: false, editId: null })
+  const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', onConfirm: null, danger: true })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { canvasRef: confettiRef, triggerConfetti } = useConfetti()
 
@@ -205,6 +207,13 @@ export default function App() {
     persistDatabase(d).then(reloadState)
   }
 
+  function editItem(groupId, listId, itemId, newText) {
+    const d = db()
+    if (!d) return
+    d.run('UPDATE items SET text=? WHERE id=?', [newText, itemId])
+    persistDatabase(d).then(reloadState)
+  }
+
   /* ── Theme / Language ── */
   function toggleTheme() {
     const newTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -226,6 +235,10 @@ export default function App() {
     groupModal,
     openGroupModal: (editId = null) => setGroupModal({ open: true, editId }),
     closeGroupModal: () => setGroupModal({ open: false, editId: null }),
+    confirmModal,
+    openConfirmModal: ({ title, message, onConfirm, danger = true }) =>
+      setConfirmModal({ open: true, title, message, onConfirm, danger }),
+    closeConfirmModal: () => setConfirmModal({ open: false, title: '', message: '', onConfirm: null, danger: true }),
     sidebarOpen,
     setSidebarOpen,
     setActiveGroup,
@@ -239,6 +252,7 @@ export default function App() {
     addItem,
     toggleItemCompletion,
     deleteItem,
+    editItem,
     toggleTheme,
     toggleLanguage,
   }
@@ -265,6 +279,7 @@ export default function App() {
         <MainPanel />
       </div>
       <GroupModal />
+      <ConfirmModal />
     </AppContext.Provider>
   )
 }

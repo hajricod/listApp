@@ -631,7 +631,7 @@ html[data-theme="light"] .sun-icon {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 240px;
+    /* max-height: 240px; */
     overflow-y: auto;
     padding-right: 2px;
 }
@@ -725,8 +725,15 @@ html[data-theme="light"] .sun-icon {
     opacity: 0.7;
 }
 
-/* Remove item btn */
-.btn-delete-item {
+/* Item action buttons */
+.item-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.btn-delete-item,
+.btn-edit-item {
     opacity: 0;
     background: transparent;
     border: none;
@@ -741,13 +748,19 @@ html[data-theme="light"] .sun-icon {
     transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
 
-.checklist-item:hover .btn-delete-item {
+.checklist-item:hover .btn-delete-item,
+.checklist-item:hover .btn-edit-item {
     opacity: 1;
 }
 
 .btn-delete-item:hover {
     color: #ef4444;
     background: rgba(239, 68, 68, 0.1);
+}
+
+.btn-edit-item:hover {
+    color: var(--accent, #6366f1);
+    background: rgba(99, 102, 241, 0.1);
 }
 
 /* Add Item Form */
@@ -1004,6 +1017,45 @@ html[data-theme="light"] .sun-icon {
     justify-content: flex-end;
     gap: 12px;
     margin-top: 32px;
+}
+
+/* ── Confirm / Delete Modal ── */
+.confirm-modal-card {
+    max-width: 380px;
+    text-align: center;
+    padding: 36px 28px 28px;
+}
+
+.confirm-modal-icon-wrap {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+}
+
+.confirm-modal-title {
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+.confirm-modal-message {
+    font-size: 0.9rem;
+    color: var(--text-sub);
+    line-height: 1.6;
+    margin-bottom: 28px;
+}
+
+.confirm-modal-footer {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
 }
 
 /* ==========================================================================
