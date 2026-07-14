@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp, useT } from '../AppContext.js'
+import { usePointerSort } from '../hooks/usePointerSort.js'
 import ListCard from './ListCard.jsx'
 import EmptyState from './EmptyState.jsx'
 import AddListCard from './AddListCard.jsx'
@@ -7,12 +8,16 @@ import AddListCard from './AddListCard.jsx'
 const LS_COLS = 'tasksphere_cols'
 
 export default function MainPanel() {
-  const { state, openGroupModal, deleteGroup, openConfirmModal } = useApp()
+  const { state, openGroupModal, deleteGroup, openConfirmModal, reorderLists } = useApp()
   const t = useT()
   const [cols, setCols] = useState(() => {
     const v = parseInt(localStorage.getItem(LS_COLS), 10)
     return isNaN(v) ? 0 : v
   })
+
+  const { activeId: activeCardId, overId: overCardId, startDrag: startCardDrag } = usePointerSort(
+    (srcId, tgtId) => reorderLists(state.activeGroupId, srcId, tgtId)
+  )
 
   useEffect(() => {
     localStorage.setItem(LS_COLS, String(cols))
@@ -101,7 +106,15 @@ export default function MainPanel() {
           style={cols > 0 ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}
         >
           {activeGroup.lists.map((list) => (
-            <ListCard key={list.id} list={list} groupId={activeGroup.id} groupColor={activeGroup.color} />
+            <ListCard
+              key={list.id}
+              list={list}
+              groupId={activeGroup.id}
+              groupColor={activeGroup.color}
+              startCardDrag={startCardDrag}
+              isCardDragging={activeCardId === list.id}
+              isCardDragOver={overCardId === list.id}
+            />
           ))}
           <AddListCard groupId={activeGroup.id} />
         </div>

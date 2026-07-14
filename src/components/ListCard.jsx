@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp, useT } from '../AppContext.js'
+import { usePointerSort } from '../hooks/usePointerSort.js'
 
 const LS_COLLAPSED = 'tasksphere_collapsed'
 
@@ -10,14 +11,12 @@ function saveCollapsedSet(set) {
   localStorage.setItem(LS_COLLAPSED, JSON.stringify([...set]))
 }
 
-export default function ListCard({ list, groupId, groupColor }) {
-  const { state, renameList, deleteList, addItem, toggleItemCompletion, deleteItem, editItem, reorderLists, reorderItems, openConfirmModal } = useApp()
+export default function ListCard({ list, groupId, groupColor, startCardDrag, isCardDragging, isCardDragOver }) {
+  const { state, renameList, deleteList, addItem, toggleItemCompletion, deleteItem, editItem, reorderItems, openConfirmModal } = useApp()
   const t = useT()
   const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState('')
   const [itemText, setItemText] = useState('')
-  const [dragging, setDragging] = useState(false)
-  const [dragOver, setDragOver] = useState(false)
   const [collapsed, setCollapsed] = useState(() => getCollapsedSet().has(list.id))
 
   useEffect(() => {
@@ -27,8 +26,10 @@ export default function ListCard({ list, groupId, groupColor }) {
   }, [collapsed, list.id])
   const [editingItemId, setEditingItemId] = useState(null)
   const [editingItemText, setEditingItemText] = useState('')
-  const [draggingItemId, setDraggingItemId] = useState(null)
-  const [dragOverItemId, setDragOverItemId] = useState(null)
+
+  const { activeId: draggingItemId, overId: dragOverItemId, startDrag: startItemDrag } = usePointerSort(
+    (srcId, tgtId) => reorderItems(groupId, list.id, srcId, tgtId)
+  )
 
   function startEditItem(item) { setEditingItemId(item.id); setEditingItemText(item.text) }
   function finishEditItem(groupId, listId, itemId) {
@@ -63,18 +64,22 @@ export default function ListCard({ list, groupId, groupColor }) {
 
   return (
     <div
-      className={`list-card${dragging ? ' dragging' : ''}${dragOver ? ' drag-over' : ''}${collapsed ? ' collapsed' : ''}`}
-      data-list-id={list.id}
-      draggable
-      onDragStart={(e) => { setDragging(true); e.dataTransfer.setData('application/list-id', list.id); e.dataTransfer.effectAllowed = 'move' }}
-      onDragEnd={() => { setDragging(false); setDragOver(false) }}
-      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver(true) }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('application/list-id'); if (id && id !== list.id) reorderLists(groupId, id, list.id) }}
+      className={`list-card${isCardDragging ? ' dragging' : ''}${isCardDragOver ? ' drag-over' : ''}${collapsed ? ' collapsed' : ''}`}
+      data-sort-card={list.id}
     >
       {/* ── Header ── */}
       <div className="list-card-header">
         <div className="list-title-area">
+          <span
+            className="card-drag-handle"
+            onPointerDown={(e) => { if (renaming) return; startCardDrag(e, list.id, e.currentTarget.closest('[data-sort-card]'), '[data-sort-card]', 'sortCard') }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="5" x2="16" y2="5" /><line x1="8" y1="10" x2="16" y2="10" />
+              <line x1="8" y1="15" x2="16" y2="15" /><line x1="8" y1="20" x2="16" y2="20" />
+            </svg>
+          </span>
           {renaming ? (
             <input
               type="text"
@@ -143,14 +148,13 @@ export default function ListCard({ list, groupId, groupColor }) {
             <div
               key={item.id}
               className={`checklist-item${draggingItemId === item.id ? ' item-dragging' : ''}${dragOverItemId === item.id ? ' item-drag-over' : ''}`}
-              draggable
-              onDragStart={(e) => { e.stopPropagation(); setDraggingItemId(item.id); e.dataTransfer.setData('application/item-id', item.id); e.dataTransfer.effectAllowed = 'move' }}
-              onDragEnd={(e) => { e.stopPropagation(); setDraggingItemId(null); setDragOverItemId(null) }}
-              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setDragOverItemId(item.id) }}
-              onDragLeave={(e) => { e.stopPropagation(); if (!e.currentTarget.contains(e.relatedTarget)) setDragOverItemId(null) }}
-              onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverItemId(null); const srcId = e.dataTransfer.getData('application/item-id'); if (srcId && srcId !== item.id) reorderItems(groupId, list.id, srcId, item.id) }}
+              data-sort-item={item.id}
             >
-              <span className="item-drag-handle" title="Drag to reorder">
+              <span
+                className="item-drag-handle"
+                title="Drag to reorder"
+                onPointerDown={(e) => startItemDrag(e, item.id, e.currentTarget.closest('[data-sort-item]'), '[data-sort-item]', 'sortItem')}
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="8" y1="6" x2="16" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="18" x2="16" y2="18" />
