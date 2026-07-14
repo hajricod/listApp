@@ -54,8 +54,9 @@ self.addEventListener('activate', (event) => {
 
 /* ---- Fetch: cache-first with network fallback ---- */
 self.addEventListener('fetch', (event) => {
-    // Only handle GET requests
+    // Only handle GET requests and HTTP(S) schemes
     if (event.request.method !== 'GET') return;
+    if (!event.request.url.startsWith('http')) return;
 
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
