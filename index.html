@@ -1,199 +1,23 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>TaskSphere - Grouped Checklist App</title>
-    <meta name="description" content="TaskSphere — beautifully organize your tasks with grouped checklists. Installable, offline-ready PWA.">
-
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
-
-    <!-- Theme Color (browser toolbar) -->
-    <meta name="theme-color" content="#3b82f6">
-
-    <!-- iOS PWA Meta Tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="TaskSphere">
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
-
-    <!-- Google Fonts: Outfit (EN headings), Inter (EN body), Cairo (Arabic typography) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Core Stylesheet -->
-    <link rel="stylesheet" href="style.css">
-
-    <!-- sql.js — WebAssembly SQLite for the browser -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>TaskSphere - Grouped Checklist App</title>
+  <meta name="description" content="TaskSphere grouped checklist PWA">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TaskSphere">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&family=Inter:wght@400;500;600&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.js"></script>
 </head>
 <body>
-    <!-- Confetti canvas for complete celebration animations -->
-    <canvas id="confetti-canvas"></canvas>
-
-    <div class="app-container">
-        <!-- Toggle Sidebar Button for Mobile View -->
-        <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Toggle Navigation Sidebar">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="menu-icon"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        </button>
-
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="logo-area">
-                    <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
-                    <h1>TaskSphere</h1>
-                </div>
-                
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <!-- Language Selector Toggle Button -->
-                    <button id="lang-toggle" class="theme-toggle-btn" aria-label="Switch Language / تغيير اللغة" style="font-weight: 800; font-size: 0.75rem; font-family: var(--font-heading);">
-                        AR
-                    </button>
-
-                    <!-- Dark / Light Theme Toggle -->
-                    <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle Dark/Light Mode">
-                        <!-- Sun Icon (shown in dark mode) -->
-                        <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-                        <!-- Moon Icon (shown in light mode) -->
-                        <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Group Management Section -->
-            <div class="sidebar-section">
-                <div class="section-title-row">
-                    <h2 data-i18n="groups-title">Groups</h2>
-                    <button id="btn-add-group-modal" class="icon-btn-primary" title="Create New Group" data-i18n-title="create-group-tooltip" aria-label="Create New Group">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    </button>
-                </div>
-                
-                <nav class="groups-list" id="groups-list" aria-label="List Groups">
-                    <!-- Groups dynamically rendered here -->
-                </nav>
-            </div>
-
-            <div class="sidebar-footer">
-                <span class="app-version">v1.0.0</span>
-                <span class="app-signature">&copy; TaskSphere</span>
-            </div>
-        </aside>
-
-        <!-- Sidebar Overlay (for closing drawer on mobile clicks) -->
-        <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-        <!-- Main Panel -->
-        <main class="main-panel">
-            <!-- Active Group Workspace -->
-            <section class="group-workspace" id="group-workspace">
-                <!-- Group Info Header -->
-                <header class="group-header" id="group-header">
-                    <!-- Group details rendered dynamically -->
-                </header>
-
-                <!-- Lists container inside active group -->
-                <div class="lists-grid" id="lists-grid">
-                    <!-- Lists dynamically rendered here -->
-                </div>
-            </section>
-
-            <!-- Empty State (when no groups exist) -->
-            <section class="empty-state-view" id="empty-state-view" style="display: none;">
-                <div class="empty-state-card">
-                    <div class="empty-icon-wrapper">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
-                    </div>
-                    <h2 data-i18n="empty-title">No Groups Found</h2>
-                    <p data-i18n="empty-desc">Start organizing your tasks by creating your first list group.</p>
-                    <button id="btn-create-first-group" class="btn btn-primary btn-large">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        <span data-i18n="btn-create-first-group">Create Group</span>
-                    </button>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- Modals Section -->
-    <!-- Group Modal (Add / Edit) -->
-    <div class="modal-overlay" id="group-modal" style="display: none;" aria-hidden="true" role="dialog">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3 id="group-modal-title" data-i18n="modal-title-add">Create New Group</h3>
-                <button class="btn-close-modal" id="btn-close-group-modal" aria-label="Close modal">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-            </div>
-            <form id="group-form">
-                <input type="hidden" id="group-edit-id">
-                <div class="form-group">
-                    <label for="group-name" data-i18n="label-group-name">Group Name</label>
-                    <input type="text" id="group-name" data-i18n-placeholder="group-name-placeholder" placeholder="e.g. Work, Personal, Shopping" required maxlength="30" autocomplete="off">
-                </div>
-                
-                <div class="form-group">
-                    <label data-i18n="label-accent-color">Accent Color</label>
-                    <div class="color-picker-grid">
-                        <!-- Custom colored radio buttons -->
-                        <label class="color-swatch-container">
-                            <input type="radio" name="group-color" value="#3b82f6" checked>
-                            <span class="color-swatch" style="background-color: #3b82f6;"></span>
-                        </label>
-                        <label class="color-swatch-container">
-                            <input type="radio" name="group-color" value="#10b981">
-                            <span class="color-swatch" style="background-color: #10b981;"></span>
-                        </label>
-                        <label class="color-swatch-container">
-                            <input type="radio" name="group-color" value="#f59e0b">
-                            <span class="color-swatch" style="background-color: #f59e0b;"></span>
-                        </label>
-                        <label class="color-swatch-container">
-                            <input type="radio" name="group-color" value="#ef4444">
-                            <span class="color-swatch" style="background-color: #ef4444;"></span>
-                        </label>
-                        <label class="color-swatch-container">
-                            <input type="radio" name="group-color" value="#ec4899">
-                            <span class="color-swatch" style="background-color: #ec4899;"></span>
-                        </label>
-                        <label class="color-swatch-container">
-                            <input type="radio" name="group-color" value="#8b5cf6">
-                            <span class="color-swatch" style="background-color: #8b5cf6;"></span>
-                        </label>
-                        <label class="color-swatch-container">
-                            <input type="radio" name="group-color" value="#06b6d4">
-                            <span class="color-swatch" style="background-color: #06b6d4;"></span>
-                        </label>
-                        <label class="color-swatch-container">
-                            <input type="radio" name="group-color" value="#14b8a6">
-                            <span class="color-swatch" style="background-color: #14b8a6;"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="btn-cancel-group-modal" data-i18n="btn-cancel">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="btn-save-group" data-i18n="btn-save">Save Group</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Core Logic Scripts -->
-    <script src="app.js"></script>
-
-    <!-- PWA Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('[TaskSphere] Service Worker registered:', reg.scope))
-                    .catch(err => console.warn('[TaskSphere] Service Worker registration failed:', err));
-            });
-        }
-    </script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
