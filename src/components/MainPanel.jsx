@@ -1,13 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp, useT } from '../AppContext.js'
 import ListCard from './ListCard.jsx'
 import EmptyState from './EmptyState.jsx'
 import AddListCard from './AddListCard.jsx'
 
+const LS_COLS = 'tasksphere_cols'
+
 export default function MainPanel() {
   const { state, openGroupModal, deleteGroup, openConfirmModal } = useApp()
   const t = useT()
-  const [cols, setCols] = useState(0)
+  const [cols, setCols] = useState(() => {
+    const v = parseInt(localStorage.getItem(LS_COLS), 10)
+    return isNaN(v) ? 0 : v
+  })
+
+  useEffect(() => {
+    localStorage.setItem(LS_COLS, String(cols))
+  }, [cols])
 
   if (state.groups.length === 0) {
     return (

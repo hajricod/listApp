@@ -207,6 +207,23 @@ export default function App() {
     persistDatabase(d).then(reloadState)
   }
 
+  function reorderItems(groupId, listId, sourceItemId, targetItemId) {
+    const d = db()
+    if (!d) return
+    const group = state.groups.find((g) => g.id === groupId)
+    if (!group) return
+    const list = group.lists.find((l) => l.id === listId)
+    if (!list) return
+    const items = [...list.items]
+    const si = items.findIndex((i) => i.id === sourceItemId)
+    const ti = items.findIndex((i) => i.id === targetItemId)
+    if (si === -1 || ti === -1) return
+    const [moved] = items.splice(si, 1)
+    items.splice(ti, 0, moved)
+    items.forEach((item, idx) => d.run('UPDATE items SET sort_order=? WHERE id=?', [idx, item.id]))
+    persistDatabase(d).then(() => setState(loadStateFromDB(d)))
+  }
+
   function editItem(groupId, listId, itemId, newText) {
     const d = db()
     if (!d) return
@@ -253,6 +270,7 @@ export default function App() {
     toggleItemCompletion,
     deleteItem,
     editItem,
+    reorderItems,
     toggleTheme,
     toggleLanguage,
   }
