@@ -16,3 +16,34 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.warn('[TaskSphere] SW failed:', err))
   })
 }
+
+/* ── PWA Install Prompt ── */
+let deferredPrompt = null
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevent the mini-infobar from appearing
+  e.preventDefault()
+  // Store the event for later use
+  deferredPrompt = e
+  console.log('[TaskSphere] Install prompt available')
+  
+  // Optionally show a custom install button
+  const installButton = document.getElementById('install-button')
+  if (installButton) {
+    installButton.style.display = 'block'
+    installButton.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt()
+        const { outcome } = await deferredPrompt.userChoice
+        console.log(`[TaskSphere] User response to install prompt: ${outcome}`)
+        deferredPrompt = null
+        installButton.style.display = 'none'
+      }
+    })
+  }
+})
+
+window.addEventListener('appinstalled', () => {
+  console.log('[TaskSphere] PWA installed successfully')
+  deferredPrompt = null
+})
