@@ -9,6 +9,7 @@ export default function ListCard({ list, groupId, groupColor }) {
   const [itemText, setItemText] = useState('')
   const [dragging, setDragging] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [editingItemId, setEditingItemId] = useState(null)
   const [editingItemText, setEditingItemText] = useState('')
 
@@ -45,7 +46,7 @@ export default function ListCard({ list, groupId, groupColor }) {
 
   return (
     <div
-      className={`list-card${dragging ? ' dragging' : ''}${dragOver ? ' drag-over' : ''}`}
+      className={`list-card${dragging ? ' dragging' : ''}${dragOver ? ' drag-over' : ''}${collapsed ? ' collapsed' : ''}`}
       data-list-id={list.id}
       draggable
       onDragStart={(e) => { setDragging(true); e.dataTransfer.setData('text/plain', list.id); e.dataTransfer.effectAllowed = 'move' }}
@@ -73,6 +74,13 @@ export default function ListCard({ list, groupId, groupColor }) {
           )}
         </div>
         <div className="list-card-header-actions">
+          <button className="list-action-btn btn-collapse-list" title={collapsed ? t('expand-list') : t('collapse-list')} onClick={() => setCollapsed((v) => !v)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transition: 'transform 0.25s ease', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
           <button className="list-action-btn btn-rename-list" title={t('rename-list')} onClick={startRename}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -88,6 +96,10 @@ export default function ListCard({ list, groupId, groupColor }) {
           </button>
         </div>
       </div>
+
+      {/* ── Collapsible body ── */}
+      <div className="list-card-body">
+      <div className="list-card-body-inner">
 
       {/* ── Progress ── */}
       <div className="list-progress-container">
@@ -180,6 +192,9 @@ export default function ListCard({ list, groupId, groupColor }) {
           </svg>
         </button>
       </form>
+
+      </div>{/* end list-card-body-inner */}
+      </div>{/* end list-card-body */}
     </div>
   )
 }

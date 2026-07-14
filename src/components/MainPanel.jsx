@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useApp, useT } from '../AppContext.js'
 import ListCard from './ListCard.jsx'
 import EmptyState from './EmptyState.jsx'
@@ -6,6 +7,7 @@ import AddListCard from './AddListCard.jsx'
 export default function MainPanel() {
   const { state, openGroupModal, deleteGroup, openConfirmModal } = useApp()
   const t = useT()
+  const [cols, setCols] = useState(0)
 
   if (state.groups.length === 0) {
     return (
@@ -51,6 +53,20 @@ export default function MainPanel() {
             </span>
           </div>
           <div className="group-actions-container">
+            <div className="cols-picker" aria-label={t('cols-picker-label')}>
+              {[1, 2, 3, 4].map((n) => (
+                <button
+                  key={n}
+                  className={`cols-btn${cols === n ? ' active' : ''}`}
+                  title={t('cols-option', { n })}
+                  onClick={() => setCols((prev) => (prev === n ? 0 : n))}
+                >
+                  <span className="cols-btn-grid" data-cols={n}>
+                    {Array.from({ length: n }).map((_, i) => <span key={i} />)}
+                  </span>
+                </button>
+              ))}
+            </div>
             <button className="btn btn-secondary" onClick={() => openGroupModal(activeGroup.id)}>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -71,7 +87,10 @@ export default function MainPanel() {
         </header>
 
         {/* ── Lists grid ── */}
-        <div className="lists-grid">
+        <div
+          className="lists-grid"
+          style={cols > 0 ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}
+        >
           {activeGroup.lists.map((list) => (
             <ListCard key={list.id} list={list} groupId={activeGroup.id} groupColor={activeGroup.color} />
           ))}
